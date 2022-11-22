@@ -4,6 +4,10 @@ This plugin helps you gather information from files, and make a summary in the f
 
 Although it is difficult to write the regular expression, once it's done, it will help you a lot.
 
+## Preview
+
+![preview](docs/preview.png)
+
 ## Usage
 
 Create a code block like this, and set the language to the `aggregator`. Then this plugin will find content based on RegExp and render the result with the template.
