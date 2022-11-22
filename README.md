@@ -46,3 +46,12 @@ This example shows how to aggregate blocks with tags in the current file. The re
 ## Settings
 
 Note the default join string is not empty. It's just the text area can not display `\n\n`.
+
+## See Also
+
+[obsidian-link-embed](https://github.com/Seraphli/obsidian-link-embed)
+
+## Thanks
+
+- [tag-summary](https://github.com/macrojd/tag-summary)
+- [tracker](https://github.com/pyrochlore/obsidian-tracker)
