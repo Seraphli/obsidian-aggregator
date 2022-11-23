@@ -101,18 +101,17 @@ export default class Aggregator extends Plugin {
 						partRegex.push(new RegExp(val, "g"));
 					});
 					let mdFiles = this.app.vault.getMarkdownFiles();
-					mdFiles = mdFiles.filter((val) => {
+					mdFiles.forEach((val) => {
 						const scopeMatches = partRegex.filter((regex) => {
 							const m = val.path.match(regex);
 							if (m == null || m.length == 0) {
-								return false;
+								if (this.settings.debug) return false;
 							}
-							return true;
+							if (this.settings.debug) return true;
 						});
 						if (scopeMatches.length > 0) {
-							return true;
+							allMDFile.push(val);
 						}
-						return false;
 					});
 				}
 				if (allMDFile.length == 0) return;
@@ -148,7 +147,9 @@ export default class Aggregator extends Plugin {
 						for (let match of matches) {
 							if (this.settings.debug) {
 								console.log(
-									`Aggregator: Find ${summary.length}th match in ${item.file.path}. ${match[0]}`
+									`Aggregator: Find ${
+										summary.length + 1
+									}th match in ${item.file.path}. ${match[0]}`
 								);
 							}
 							let result = m.template({ match });
