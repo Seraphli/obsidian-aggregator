@@ -76,31 +76,49 @@ export default class Aggregator extends Plugin {
 				}
 
 				// Filter files
-				const scopes: string[] = [];
+				const allMDFile: TFile[] = [];
+				const partRegexFile: string[] = [];
 				args.scope.forEach((val) => {
 					if (val == CURFILE) {
-						scopes.push(ctx.sourcePath);
-					} else {
-						scopes.push(val);
-					}
-				});
-				let mdFiles = this.app.vault.getMarkdownFiles();
-				mdFiles = mdFiles.filter((val) => {
-					const scopeMatches = scopes.filter((file) => {
-						if (val.path.indexOf(file) < 0) {
-							return false;
+						const file = this.app.vault.getAbstractFileByPath(
+							ctx.sourcePath
+						);
+						if (file instanceof TFile) {
+							allMDFile.push(file);
 						}
-						return true;
-					});
-					if (scopeMatches.length > 0) {
-						return true;
+					} else {
+						const file = this.app.vault.getAbstractFileByPath(val);
+						if (file instanceof TFile) {
+							allMDFile.push(file);
+						} else {
+							partRegexFile.push(val);
+						}
 					}
-					return false;
 				});
-				if (mdFiles.length == 0) return;
+				if (partRegexFile.length > 0) {
+					const partRegex: RegExp[] = [];
+					partRegexFile.forEach((val) => {
+						partRegex.push(new RegExp(val, "g"));
+					});
+					let mdFiles = this.app.vault.getMarkdownFiles();
+					mdFiles = mdFiles.filter((val) => {
+						const scopeMatches = partRegex.filter((regex) => {
+							const m = val.path.match(regex);
+							if (m == null || m.length == 0) {
+								return false;
+							}
+							return true;
+						});
+						if (scopeMatches.length > 0) {
+							return true;
+						}
+						return false;
+					});
+				}
+				if (allMDFile.length == 0) return;
 				if (this.settings.debug) {
 					const files: string[] = [];
-					for (const file of mdFiles) {
+					for (const file of allMDFile) {
 						files.push(file.path);
 					}
 					console.log("Aggregator: files", files.join("\n"));
@@ -108,7 +126,7 @@ export default class Aggregator extends Plugin {
 
 				// Read file content
 				let fileContents: { file: TFile; content: string }[] = [];
-				for (const file of mdFiles) {
+				for (const file of allMDFile) {
 					const content = await this.app.vault.cachedRead(file);
 					fileContents.push({ file, content });
 				}

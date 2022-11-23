@@ -6,7 +6,13 @@ Although it is difficult to write the regular expression, once it's done, it wil
 
 ## Preview
 
+A collection of blocks with a tag.
+
 ![preview](docs/preview.png)
+
+A collection of annotator blocks with the `#question` tag.
+
+![annotator-preview](docs/annotator-preview.png)
 
 ## Usage
 
@@ -24,7 +30,9 @@ matches:
 
 Arguments should be written in YAML.
 
-**scope:** (list of strings) Define the search scope, which can be folder name, file name or the file path in the vault. `Current File` is a reserved keyword.
+**scope:** (list of Regular expressions) Define the search scope, which can be folder name, file name or the file path in the vault. `Current File` is a reserved keyword.
+
+Note: For better performance in a large vault, you should consider using the exact file path instead of a regular expression to avoid searching the whole vault.
 
 **matches:** (list of matches)
 
@@ -47,11 +55,13 @@ This example shows how to aggregate blocks with tags in the current file. The re
 
 Note the default join string is not empty. It's just the text area can not display `\n\n`.
 
+`File Indicator` is a Handlebars template. Available data: file: `TFile`, index: number starts at 1.
+
 ## See Also
 
 [obsidian-link-embed](https://github.com/Seraphli/obsidian-link-embed)
 
 ## Thanks
 
-- [tag-summary](https://github.com/macrojd/tag-summary)
-- [tracker](https://github.com/pyrochlore/obsidian-tracker)
+-   [tag-summary](https://github.com/macrojd/tag-summary)
+-   [tracker](https://github.com/pyrochlore/obsidian-tracker)
