@@ -105,9 +105,9 @@ export default class Aggregator extends Plugin {
 						const scopeMatches = partRegex.filter((regex) => {
 							const m = val.path.match(regex);
 							if (m == null || m.length == 0) {
-								if (this.settings.debug) return false;
+								return false;
 							}
-							if (this.settings.debug) return true;
+							return true;
 						});
 						if (scopeMatches.length > 0) {
 							allMDFile.push(val);
