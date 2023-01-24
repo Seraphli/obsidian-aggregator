@@ -4,6 +4,8 @@ import Aggregator from "main";
 export interface AggregatorSettings {
 	fileLink: boolean;
 	noCurFile: boolean;
+	defaultFields: string;
+	defaultOrders: string;
 	fileIndecator: string;
 	joinString: string;
 	limitResult: number;
@@ -14,7 +16,9 @@ export interface AggregatorSettings {
 export const DEFAULT_SETTINGS: AggregatorSettings = {
 	fileLink: true,
 	noCurFile: true,
-	fileIndecator: "ID {{index}}, From [[{{file.path}}]]\n",
+	defaultFields: "ctime, index",
+	defaultOrders: "asc, asc",
+	fileIndecator: "ID {{index}}, From [[{{result.path}}]]\n",
 	joinString: "\n\n",
 	limitResult: 100,
 	excludedRegex: "",
@@ -57,6 +61,28 @@ export class AggregatorSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.noCurFile)
 					.onChange((value) => {
 						this.plugin.settings.noCurFile = value;
+						this.plugin.saveSettings();
+					});
+			});
+		new Setting(containerEl)
+			.setName("Default Fields")
+			.setDesc("Default fields for sorting.")
+			.addText((value) => {
+				value
+					.setValue(this.plugin.settings.defaultFields)
+					.onChange((value) => {
+						this.plugin.settings.defaultFields = value;
+						this.plugin.saveSettings();
+					});
+			});
+		new Setting(containerEl)
+			.setName("Default Orders")
+			.setDesc("Default orders for sorting.")
+			.addText((value) => {
+				value
+					.setValue(this.plugin.settings.defaultOrders)
+					.onChange((value) => {
+						this.plugin.settings.defaultOrders = value;
 						this.plugin.saveSettings();
 					});
 			});

@@ -10,9 +10,20 @@ import {
 	DEFAULT_SETTINGS,
 	AggregatorSettingTab,
 } from "settings";
-import { AggregatorArgs } from "dataclass";
-import { CURFILE } from "./constants";
+import { AggregatorArgs, Result } from "dataclass";
+import { CURFILE, SELFBLOCK, FIELDS, ORDERS } from "./constants";
 import * as Handlebars from "handlebars";
+import * as _ from "lodash";
+
+function checkOrder(fields: string[], orders: string[]) {
+	if (fields.length != orders.length)
+		return { flag: false, msg: "length of fields and orders must match" };
+	if (!fields.every((val) => FIELDS.includes(val)))
+		return { flag: false, msg: `fields must in ${FIELDS}` };
+	if (!orders.every((val) => ORDERS.includes(val)))
+		return { flag: false, msg: `orders must in ${ORDERS}` };
+	return { flag: true, msg: "" };
+}
 
 export default class Aggregator extends Plugin {
 	settings: AggregatorSettings;
@@ -48,12 +59,19 @@ export default class Aggregator extends Plugin {
 					console.log("Aggregator", error);
 					return;
 				}
+				if (this.settings.debug) {
+					console.log("Aggregator: args", args);
+				}
 
 				// Handle arguments
 				let argsMatches: {
 					regex: RegExp;
 					template: HandlebarsTemplateDelegate;
 				}[] = [];
+				let argsOrders: {
+					fields: string[];
+					orders: string[];
+				} = { fields: [], orders: [] };
 				try {
 					for (const m of args.matches) {
 						const regex = new RegExp(m.regex, "gm");
@@ -62,6 +80,19 @@ export default class Aggregator extends Plugin {
 						});
 						argsMatches.push({ regex, template });
 					}
+					if (args.order) {
+						argsOrders.fields = args.order.fields
+							.split(",")
+							.map((val) => val.trim());
+						argsOrders.orders = args.order.orders
+							.split(",")
+							.map((val) => val.trim());
+						const res = checkOrder(
+							argsOrders.fields,
+							argsOrders.orders
+						);
+						if (!res.flag) throw Error(res.msg);
+					}
 				} catch (error) {
 					await this.renderMarkdown(
 						`**Error**: Arguments parse error.\n${error}`,
@@ -69,6 +100,7 @@ export default class Aggregator extends Plugin {
 						ctx
 					);
 					console.log("Aggregator", error);
+					return;
 				}
 				if (argsMatches.length == 0) return;
 				if (this.settings.debug) {
@@ -123,19 +155,13 @@ export default class Aggregator extends Plugin {
 					console.log("Aggregator: files", files.join("\n"));
 				}
 
-				// Read file content
-				let fileContents: { file: TFile; content: string }[] = [];
+				// Collect results
+				let results: Result[] = [];
 				for (const file of allMDFile) {
-					const content = await this.app.vault.cachedRead(file);
-					fileContents.push({ file, content });
-				}
-
-				// Create summary
-				let summary: string[] = [];
-				const selfBlock = /```aggregator[\S\s]*?```/gm;
-				fileContents.forEach((item) => {
-					if (summary.length > this.settings.limitResult) return;
-					let content = item.content.replace(selfBlock, "");
+					if (results.length > this.settings.limitResult) break;
+					// Read file content
+					let content = await this.app.vault.cachedRead(file);
+					content = content.replace(SELFBLOCK, "");
 					if (this.settings.excludedRegex != "") {
 						content = content.replace(
 							new RegExp(this.settings.excludedRegex),
@@ -143,38 +169,115 @@ export default class Aggregator extends Plugin {
 						);
 					}
 					for (const m of argsMatches) {
+						if (results.length > this.settings.limitResult) break;
 						let matches = content.matchAll(m.regex);
 						for (let match of matches) {
+							if (results.length > this.settings.limitResult)
+								break;
 							if (this.settings.debug) {
 								console.log(
-									`Aggregator: Find ${
-										summary.length + 1
-									}th match in ${item.file.path}. ${match[0]}`
+									`Aggregator: Find match in ${file.path}. ${match[0]}`
 								);
 							}
-							let result = m.template({ match });
-							if (this.settings.fileLink) {
-								if (
-									this.settings.noCurFile &&
-									item.file.path != ctx.sourcePath
-								) {
-									result =
-										Handlebars.compile(
-											this.settings.fileIndecator
-										)({
-											file: item.file,
-											index: summary.length + 1,
-										}) + result;
-								}
-							}
-							if (summary.length > this.settings.limitResult)
-								return;
-							summary.push(result);
+
+							let substringStartToMatch = content.substring(
+								0,
+								match.index
+							);
+							let lines = substringStartToMatch.split("\n");
+							let numberOfLines = lines.length;
+							let numberOfChars = lines[lines.length - 1].length;
+							let template = m.template({ match });
+
+							let result: Result = {
+								path: file.path,
+								filename: file.basename + file.extension,
+								basename: file.basename,
+								extension: file.extension,
+								ctime: file.stat.ctime,
+								mtime: file.stat.mtime,
+								match: match[0],
+								index: match.index ? match.index : -1,
+								line: numberOfLines,
+								ch: numberOfChars,
+								template: template,
+							};
+							results.push(result);
 						}
 					}
+				}
+
+				// Sort
+				if (argsOrders.fields.length > 0) {
+					results = _.orderBy(
+						results,
+						argsOrders.fields,
+						// @ts-ignore
+						argsOrders.orders
+					);
+				} else {
+					if (this.settings.defaultFields.length > 0) {
+						const fields = this.settings.defaultFields
+							.split(",")
+							.map((val) => val.trim());
+						const orders = this.settings.defaultOrders
+							.split(",")
+							.map((val) => val.trim());
+						const res = checkOrder(fields, orders);
+						if (res.flag) {
+							results = _.orderBy(
+								results,
+								fields,
+								// @ts-ignore
+								orders
+							);
+						} else {
+							results = _.orderBy(
+								results,
+								["ctime", "line"],
+								["asc", "asc"]
+							);
+						}
+					} else {
+						results = _.orderBy(
+							results,
+							["ctime", "line"],
+							["asc", "asc"]
+						);
+					}
+				}
+				if (this.settings.debug) {
+					console.log("Aggregator: results", results);
+				}
+
+				// Create summary
+				let summaries: string[] = [];
+				results.forEach((result) => {
+					let summary = result.template;
+					if (this.settings.fileLink) {
+						if (
+							!(
+								result.path == ctx.sourcePath &&
+								this.settings.noCurFile
+							)
+						) {
+							summary =
+								Handlebars.compile(this.settings.fileIndecator)(
+									{
+										result: result,
+										index: summaries.length + 1,
+									}
+								) + summary;
+						}
+					}
+					summaries.push(summary);
 				});
+				if (this.settings.debug) {
+					console.log("Aggregator: summaries", summaries);
+				}
+
 				await this.renderMarkdown(
-					summary.join(this.settings.joinString),
+					summaries.join(this.settings.joinString),
 					el,
 					ctx
 				);

@@ -1,7 +1,7 @@
 {
 	"id": "obsidian-aggregator",
 	"name": "Aggregator",
-	"version": "0.1.4",
+	"version": "0.2.4",
 	"minAppVersion": "0.15.0",
 	"description": "This plugin helps you gather information from files, and make a summary in the file.",
 	"author": "SErAphLi",

@@ -10,7 +10,7 @@ A collection of blocks with a tag.
 
 ![preview](docs/preview.png)
 
-A collection of annotator blocks with the `#question` tag.
+A collection of annotator blocks with tags.
 
 ![annotator-preview](docs/annotator-preview.png)
 
@@ -26,13 +26,33 @@ matches:
       template: '{{{match.[0]}}}'
 ````
 
+If you want to sort the results, you can specify the fields and orders like this.
+
+````aggregator
+scope:
+    - Current File
+    - Papers
+matches:
+    - regex: '^\w[^\#]*\#[a-zA-Z0-9\_]+\s*$'
+      template: '{{{match.[0]}}}'
+    - regex: '>%%\n>```annotation-json\n>.*\n>```\n>%%\n>\*%%PREFIX%%.*\n>%%LINK%%.*\n>%%COMMENT%%\n>.*\n>%%TAGS%%\n>\#[a-zA-Z0-9\_]+\n\^[a-zA-Z0-9]*'
+      template: '{{{match.[0]}}}'
+order:
+    fields: filename, line
+    orders: asc, asc
+````
+
 ### Argument Explain
 
 Arguments should be written in YAML.
 
+#### scope
+
 **scope:** (list of Regular expressions) Define the search scope, which can be folder name, file name or the file path in the vault. `Current File` is a reserved keyword.
 
 Note: For better performance in a large vault, you should consider using the exact file path instead of a regular expression to avoid searching the whole vault.
+
+#### matches
 
 **matches:** (list of matches)
 
@@ -40,6 +60,14 @@ Note: For better performance in a large vault, you should consider using the exa
 
 -   regex: Regular expression.
 -   template: Handlebars template. Available data: `match`, type: `RegExpMatchArray`.
+
+#### order
+
+**order**: (fields and orders) Define the fields you want to sort by and the direction you want, separated by commas. When not present, the plugin will first check the default fields and orders in the setting. If the setting is not valid, the plugin will sort the results by the creating time and the line number.
+
+Valid fields: path, filename, basename, extension, ctime, mtime, match, index, line, ch, template
+
+Valid orders: asc, desc
 
 ## Example Usage
 
