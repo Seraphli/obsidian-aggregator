@@ -17,7 +17,7 @@ scope:
     - Current File
 matches:
     - regex: '>%%\n>```annotation-json\n>.*\n>```\n>%%\n>\*%%PREFIX%%.*\n>%%LINK%%.*\n>%%COMMENT%%\n([^%]*\n)*>%%TAGS%%\n>\#[a-zA-Z0-9\_]+\n\^[a-zA-Z0-9]*'
-      template: '{{{match.[0]}}}'
+      template: '{{{result.match.[0]}}}'
 ```
 
 

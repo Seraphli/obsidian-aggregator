@@ -4,7 +4,7 @@ scope:
     - Current File
 matches:
     - regex: '^\w[^\#]*\#[a-zA-Z0-9\_]+\s*$'
-      template: '{{{match.[0]}}}'
+      template: '{{{result.match.[0]}}}'
 ```
 
 

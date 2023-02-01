@@ -28,7 +28,7 @@ scope:
     - Current File
 matches:
     - regex: '>%%\n>```annotation-json\n>.*\n>```\n>%%\n>\*%%PREFIX%%.*\n>%%LINK%%.*\n>%%COMMENT%%\n>.*\n>%%TAGS%%\n>\#[a-zA-Z0-9\_]+\n\^[a-zA-Z0-9]*'
-      template: '{{{match.[0]}}}'
+      template: '{{{result.match.[0]}}}'
 ````
 
 If you want to sort the results, you can specify the fields and orders like this.
@@ -39,9 +39,9 @@ scope:
     - Papers
 matches:
     - regex: '^\w[^\#]*\#[a-zA-Z0-9\_]+\s*$'
-      template: '{{{match.[0]}}}'
+      template: '{{{result.match.[0]}}}'
     - regex: '>%%\n>```annotation-json\n>.*\n>```\n>%%\n>\*%%PREFIX%%.*\n>%%LINK%%.*\n>%%COMMENT%%\n>.*\n>%%TAGS%%\n>\#[a-zA-Z0-9\_]+\n\^[a-zA-Z0-9]*'
-      template: '{{{match.[0]}}}'
+      template: '{{{result.match.[0]}}}'
 order:
     fields: filename, line
     orders: asc, asc
