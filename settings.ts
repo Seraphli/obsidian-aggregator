@@ -8,7 +8,8 @@ export interface AggregatorSettings {
 	defaultOrders: string;
 	fileIndecator: string;
 	joinString: string;
-	limitResult: number;
+	limitSearch: number;
+	limitDisplay: number;
 	excludedRegex: string;
 	debug: boolean;
 }
@@ -18,9 +19,10 @@ export const DEFAULT_SETTINGS: AggregatorSettings = {
 	noCurFile: true,
 	defaultFields: "ctime, index",
 	defaultOrders: "asc, asc",
-	fileIndecator: "ID {{index}}, From [[{{result.path}}]]\n",
-	joinString: "\n\n",
-	limitResult: 100,
+	fileIndecator: "ID {{result.index}}, From [[{{result.path}}]]\n{{template}}",
+	joinString: "\n",
+	limitSearch: 100,
+	limitDisplay: -1,
 	excludedRegex: "",
 	debug: false,
 };
@@ -111,14 +113,31 @@ export class AggregatorSettingTab extends PluginSettingTab {
 					});
 			});
 		new Setting(containerEl)
-			.setName("Limit Result")
-			.setDesc("Limit the number of results in the summary.")
+			.setName("Found Result Limitation")
+			.setDesc(
+				"Limit the number of found results when searching in the summary. Set the number larger than 0 to enable."
+			)
 			.addText((value) => {
 				value
-					.setValue(String(this.plugin.settings.limitResult))
+					.setValue(String(this.plugin.settings.limitSearch))
 					.onChange((value) => {
 						if (!isNaN(Number(value))) {
-							this.plugin.settings.limitResult = Number(value);
+							this.plugin.settings.limitSearch = Number(value);
+							this.plugin.saveSettings();
+						}
+					});
+			});
+		new Setting(containerEl)
+			.setName("Display Result Limitation")
+			.setDesc(
+				"Limit the number of results when displaying in the summary. Set the number larger than 0 to enable."
+			)
+			.addText((value) => {
+				value
+					.setValue(String(this.plugin.settings.limitDisplay))
+					.onChange((value) => {
+						if (!isNaN(Number(value))) {
+							this.plugin.settings.limitDisplay = Number(value);
 							this.plugin.saveSettings();
 						}
 					});

@@ -6,13 +6,18 @@ Although it is difficult to write the regular expression, once it's done, it wil
 
 ## Preview
 
-A collection of blocks with a tag.
+A collection of blocks with a tag. [Example1](docs/Example1.md)
 
-![preview](docs/preview.png)
+![example1-preview](docs/example1-preview.png)
 
-A collection of annotator blocks with tags.
+A collection of annotator blocks with tags. [Example2](docs/Example2.md)
 
-![annotator-preview](docs/annotator-preview.png)
+![example2-preview](docs/example2-preview.png)
+
+A stat table that is generated from a folder with custom helper supported. [Example3](docs/Example3.md)
+
+![example3-preview](docs/example3-preview.png)
+
 
 ## Usage
 
@@ -42,42 +47,13 @@ order:
     orders: asc, asc
 ````
 
-### Argument Explain
+## Argument Explain
 
-Arguments should be written in YAML.
-
-#### scope
-
-**scope:** (list of Regular expressions) Define the search scope, which can be folder name, file name or the file path in the vault. `Current File` is a reserved keyword.
-
-Note: For better performance in a large vault, you should consider using the exact file path instead of a regular expression to avoid searching the whole vault.
-
-#### matches
-
-**matches:** (list of matches)
-
-**match**
-
--   regex: Regular expression.
--   template: Handlebars template. Available data: `match`, type: `RegExpMatchArray`.
-
-#### order
-
-**order**: (fields and orders) Define the fields you want to sort by and the direction you want, separated by commas. When not present, the plugin will first check the default fields and orders in the setting. If the setting is not valid, the plugin will sort the results by the creating time and the line number.
-
-Valid fields: path, filename, basename, extension, ctime, mtime, match, index, line, ch, template
-
-Valid orders: asc, desc
+Check out [Arguments.md](docs/Arguments.md).
 
 ## Example Usage
 
-### Example 1 Explain
-
-This example shows how to aggregate blocks with tags in the current file.
-
-### Example 2 Explain
-
-This example shows how to aggregate blocks with tags in the current file. The regex is designed for [obsidian-annotator](https://github.com/elias-sundqvist/obsidian-annotator).
+Check out [docs](docs/) for detailed examples.
 
 ## Settings
 

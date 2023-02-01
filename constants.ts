@@ -11,6 +11,5 @@ export const FIELDS = [
 	"index",
 	"line",
 	"ch",
-	"template",
 ];
 export const ORDERS = ["asc", "desc"];

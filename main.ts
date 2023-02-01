@@ -1,6 +1,8 @@
+/* eslint no-eval: 0 */
 import {
 	Plugin,
 	parseYaml,
+	stringifyYaml,
 	TFile,
 	MarkdownRenderer,
 	MarkdownPostProcessorContext,
@@ -10,10 +12,11 @@ import {
 	DEFAULT_SETTINGS,
 	AggregatorSettingTab,
 } from "settings";
-import { AggregatorArgs, Result } from "dataclass";
+import { AggregatorArgs, Register, Result } from "dataclass";
 import { CURFILE, SELFBLOCK, FIELDS, ORDERS } from "./constants";
 import * as Handlebars from "handlebars";
 import * as _ from "lodash";
+import * as moment from "moment";
 
 function checkOrder(fields: string[], orders: string[]) {
 	if (fields.length != orders.length)
@@ -47,7 +50,7 @@ export default class Aggregator extends Plugin {
 				}
 
 				// Parse yaml
-				let args;
+				let args: AggregatorArgs;
 				try {
 					args = parseYaml(source) as AggregatorArgs;
 				} catch (error) {
@@ -156,11 +159,15 @@ export default class Aggregator extends Plugin {
 				}
 
 				// Collect results
+				const limitSearch = !isNaN(Number(args.limitSearch))
+					? Number(args.limitSearch)
+					: this.settings.limitSearch;
 				let results: Result[] = [];
 				for (const file of allMDFile) {
-					if (results.length > this.settings.limitResult) break;
+					if (limitSearch > 0 && results.length > limitSearch) break;
 					// Read file content
-					let content = await this.app.vault.cachedRead(file);
+					const fileContent = await this.app.vault.cachedRead(file);
+					let content = fileContent;
 					content = content.replace(SELFBLOCK, "");
 					if (this.settings.excludedRegex != "") {
 						content = content.replace(
@@ -169,10 +176,11 @@ export default class Aggregator extends Plugin {
 						);
 					}
 					for (const m of argsMatches) {
-						if (results.length > this.settings.limitResult) break;
+						if (limitSearch > 0 && results.length > limitSearch)
+							break;
 						let matches = content.matchAll(m.regex);
 						for (let match of matches) {
-							if (results.length > this.settings.limitResult)
+							if (limitSearch > 0 && results.length > limitSearch)
 								break;
 							if (this.settings.debug) {
 								console.log(
@@ -187,20 +195,26 @@ export default class Aggregator extends Plugin {
 							let lines = substringStartToMatch.split("\n");
 							let numberOfLines = lines.length;
 							let numberOfChars = lines[lines.length - 1].length;
-							let template = m.template({ match });
 
 							let result: Result = {
+								index: 0,
 								path: file.path,
 								filename: file.basename + file.extension,
 								basename: file.basename,
 								extension: file.extension,
 								ctime: file.stat.ctime,
 								mtime: file.stat.mtime,
-								match: match[0],
-								index: match.index ? match.index : -1,
+								match: match,
+								matchIndex: match.index ? match.index : -1,
 								line: numberOfLines,
 								ch: numberOfChars,
-								template: template,
+								content: content,
+								template: m.template,
+								register: {
+									s: "",
+									n: 0,
+									b: false,
+								},
 							};
 							results.push(result);
 						}
@@ -252,35 +266,86 @@ export default class Aggregator extends Plugin {
 
 				// Create summary
 				let summaries: string[] = [];
-				results.forEach((result) => {
-					let summary = result.template;
-					if (this.settings.fileLink) {
-						if (
-							!(
-								result.path == ctx.sourcePath &&
-								this.settings.noCurFile
-							)
-						) {
-							summary =
-								Handlebars.compile(this.settings.fileIndecator)(
-									{
-										result: result,
-										index: summaries.length + 1,
-									}
-								) + summary;
+				const limitDisplay = !isNaN(Number(args.limitDisplay))
+					? Number(args.limitDisplay)
+					: this.settings.limitDisplay;
+				const fileLink =
+					args.fileLink == null || args.fileLink == undefined
+						? this.settings.fileLink
+						: args.fileLink;
+				const noCurFile =
+					args.noCurFile == null || args.noCurFile == undefined
+						? this.settings.noCurFile
+						: args.noCurFile;
+				const fileIndecator =
+					args.fileIndecator == null ||
+					args.fileIndecator == undefined
+						? this.settings.fileIndecator
+						: args.fileIndecator;
+				const register: Register = { s: "", n: 0, b: false };
+				for (const result of results) {
+					if (limitDisplay > 0 && summaries.length > limitDisplay)
+						break;
+					let template = result.template;
+					result.index = summaries.length + 1;
+					let data = { result, summaries, register };
+					Handlebars.registerHelper("eval", (aString: string) => {
+						const ret = new Function("data", aString)(data);
+						return ret == null || ret == undefined ? "" : ret;
+					});
+					let summary = template(data);
+					if (fileLink) {
+						if (!(result.path == ctx.sourcePath && noCurFile)) {
+							let data = {
+								result,
+								summaries,
+								register,
+								template: summary,
+							};
+							Handlebars.registerHelper(
+								"eval",
+								(aString: string) => {
+									const ret = new Function("data", aString)(
+										data
+									);
+									return ret == null || ret == undefined
+										? ""
+										: ret;
+								}
+							);
+							summary = Handlebars.compile(fileIndecator)(data);
 						}
 					}
 					summaries.push(summary);
-				});
+				}
 				if (this.settings.debug) {
 					console.log("Aggregator: summaries", summaries);
 				}
 
-				await this.renderMarkdown(
-					summaries.join(this.settings.joinString),
-					el,
-					ctx
-				);
+				const jstr =
+					args.joinString == null || args.joinString == undefined
+						? this.settings.joinString
+						: args.joinString;
+				let summary = summaries.join(jstr);
+				if (this.settings.debug) {
+					console.log("Aggregator: summary", summary);
+				}
+				if (!(args.decorator == null || args.decorator == undefined)) {
+					let data = {
+						templates: summary,
+						summaries,
+						register,
+					};
+					Handlebars.registerHelper("eval", (aString: string) => {
+						const ret = new Function("data", aString)(data);
+						return ret == null || ret == undefined ? "" : ret;
+					});
+					summary = Handlebars.compile(args.decorator)(data);
+					if (this.settings.debug) {
+						console.log("Aggregator: decorated summary", summary);
+					}
+				}
+				await this.renderMarkdown(summary, el, ctx);
 			}
 		);
 
