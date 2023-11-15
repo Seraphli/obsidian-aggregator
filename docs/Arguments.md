@@ -4,6 +4,16 @@ Arguments should be written in YAML.
 
 The dataclass is defined in [dataclass.ts](../dataclass.ts)
 
+## Processing Pipeline
+
+1. Search files in the vault based on the `scope` argument.
+2. Search the content in the files based on the `matches` argument.
+3. Sort the results based on the `order` argument.
+4. Render the summary based on the `template` argument.
+5. Render the summary based on the `fileIndecator` argument.
+6. Concatenate the results based on the `joinString` argument.
+7. Decorate the summary based on the `decorator` argument.
+
 ## Support Arguments
 
 ```typescript
@@ -44,7 +54,7 @@ export class Result {
 }
 ```
 
-`Register` can be used to store data.
+`Register` can be used to store any data.
 
 ```typescript
 export class Register {
@@ -89,11 +99,19 @@ matches:
       template: '{{{result.match.[0]}}}'
 ```
 
-Valid input(data):
+Valid input(data) for `eval`:
 
-result(Result): result data
-index(number): index in the summary
-register(Register): global register
+```js
+let data: {
+	result: Result;
+	summaries: string[];
+	register: Register;
+}
+```
+
+- result(Result): result data
+- summaries(list of string): the list before being concatenatd
+- register(Register): global register
 
 
 ## order
@@ -125,11 +143,19 @@ decorator: "| ID  | Note | ModifyTime | Done        |\n| --- | ---- | ----------
 ```
 Wrap the summary with table heading.
 
-Valid input(data):
+Valid input(data) for `eval`:
 
-templates(string): concatenated string
-summaries(list of string): the list before being concatenatd
-register(Register): global register
+```js
+let data: {
+	templates: string;
+	summaries: string[];
+	register: Register;
+}
+```
+
+- templates(string): concatenated string
+- summaries(list of string): the list before being concatenatd
+- register(Register): global register
 
 
 ## fileIndecator
@@ -143,12 +169,21 @@ fileIndecator: >-
   |{{index}}|[[{{result.basename}}]]|{{eval "return moment.unix(data.result.mtime/1000).format('YYYY-MM-DD')"}}|{{template}}|
 ```
 
-Valid input(data):
+Valid input(data) for `eval`:
 
-result(Result): result data
-index(number): index in the summary
-template(string): each summary
-register(Register): global register
+```js
+let data: {
+	result: Result;
+	summaries: string[];
+	register: Register;
+	template: string;
+}
+```
+
+- result(Result): result data
+- summaries(list of string): the list before being concatenatd
+- template(string): each summary
+- register(Register): global register
 
 ## Other Arguments
 
