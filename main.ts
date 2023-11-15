@@ -63,7 +63,7 @@ export default class Aggregator extends Plugin {
 					return;
 				}
 				if (this.settings.debug) {
-					console.log("Aggregator: args", args);
+					console.log("Aggregator: args\n", args);
 				}
 
 				// Handle arguments
@@ -107,7 +107,7 @@ export default class Aggregator extends Plugin {
 				}
 				if (argsMatches.length == 0) return;
 				if (this.settings.debug) {
-					console.log("Aggregator: argsMatches", argsMatches);
+					console.log("Aggregator: argsMatches\n", argsMatches);
 				}
 
 				// Filter files
@@ -155,7 +155,7 @@ export default class Aggregator extends Plugin {
 					for (const file of allMDFile) {
 						files.push(file.path);
 					}
-					console.log("Aggregator: files", files.join("\n"));
+					console.log("Aggregator: files\n", files.join("\n"));
 				}
 
 				// Collect results
@@ -184,7 +184,7 @@ export default class Aggregator extends Plugin {
 								break;
 							if (this.settings.debug) {
 								console.log(
-									`Aggregator: Find match in ${file.path}. ${match[0]}`
+									`Aggregator: Find match in\n${file.path} -> ${match[0]}`
 								);
 							}
 
@@ -261,7 +261,7 @@ export default class Aggregator extends Plugin {
 					}
 				}
 				if (this.settings.debug) {
-					console.log("Aggregator: results", results);
+					console.log("Aggregator: results\n", results);
 				}
 
 				// Create summary
@@ -288,7 +288,11 @@ export default class Aggregator extends Plugin {
 						break;
 					let template = result.template;
 					result.index = summaries.length + 1;
-					let data = { result, summaries, register };
+					let data: {
+						result: Result;
+						summaries: string[];
+						register: Register;
+					} = { result, summaries, register };
 					Handlebars.registerHelper("eval", (aString: string) => {
 						const ret = new Function("data", aString)(data);
 						return ret == null || ret == undefined ? "" : ret;
@@ -296,7 +300,12 @@ export default class Aggregator extends Plugin {
 					let summary = template(data);
 					if (fileLink) {
 						if (!(result.path == ctx.sourcePath && noCurFile)) {
-							let data = {
+							let data: {
+								result: Result;
+								summaries: string[];
+								register: Register;
+								template: string;
+							} = {
 								result,
 								summaries,
 								register,
@@ -319,7 +328,7 @@ export default class Aggregator extends Plugin {
 					summaries.push(summary);
 				}
 				if (this.settings.debug) {
-					console.log("Aggregator: summaries", summaries);
+					console.log("Aggregator: summaries\n", summaries);
 				}
 
 				const jstr =
@@ -328,10 +337,14 @@ export default class Aggregator extends Plugin {
 						: args.joinString;
 				let summary = summaries.join(jstr);
 				if (this.settings.debug) {
-					console.log("Aggregator: summary", summary);
+					console.log(`Aggregator: summary\n${summary}`);
 				}
 				if (!(args.decorator == null || args.decorator == undefined)) {
-					let data = {
+					let data: {
+						templates: string;
+						summaries: string[];
+						register: Register;
+					} = {
 						templates: summary,
 						summaries,
 						register,
@@ -342,7 +355,9 @@ export default class Aggregator extends Plugin {
 					});
 					summary = Handlebars.compile(args.decorator)(data);
 					if (this.settings.debug) {
-						console.log("Aggregator: decorated summary", summary);
+						console.log(
+							`Aggregator: decorated summary\n${summary}`
+						);
 					}
 				}
 				await this.renderMarkdown(summary, el, ctx);
@@ -373,12 +388,18 @@ export default class Aggregator extends Plugin {
 		ctx: MarkdownPostProcessorContext
 	) {
 		let summaryContainer = createEl("div");
-		await MarkdownRenderer.renderMarkdown(
+		await MarkdownRenderer.render(
+			this.app,
 			source,
 			summaryContainer,
 			ctx.sourcePath,
 			this
 		);
+		if (this.settings.debug) {
+			console.log(
+				`Aggregator: html element\n${summaryContainer.innerHTML}`
+			);
+		}
 		el.replaceWith(summaryContainer);
 	}
 }
