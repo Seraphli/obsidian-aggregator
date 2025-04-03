@@ -27,7 +27,7 @@ Create a code block like this, and set the language to the `aggregator`. Then th
 scope:
     - Current File
 matches:
-    - regex: '>%%\n>```annotation-json\n>.*\n>```\n>%%\n>\*%%PREFIX%%.*\n>%%LINK%%.*\n>%%COMMENT%%\n>.*\n>%%TAGS%%\n>\#[a-zA-Z0-9\_]+\n\^[a-zA-Z0-9]*'
+    - regex: '(?<=^>%%COMMENT%%\n)(?:(?!^>%%TAGS%%).*\n)+(?=^>%%TAGS%%\n>.*#[a-zA-Z0-9\_]+)'
       template: '{{{result.match.[0]}}}'
 ````
 
@@ -40,7 +40,7 @@ scope:
 matches:
     - regex: '^\w[^\#]*\#[a-zA-Z0-9\_]+\s*$'
       template: '{{{result.match.[0]}}}'
-    - regex: '>%%\n>```annotation-json\n>.*\n>```\n>%%\n>\*%%PREFIX%%.*\n>%%LINK%%.*\n>%%COMMENT%%\n>.*\n>%%TAGS%%\n>\#[a-zA-Z0-9\_]+\n\^[a-zA-Z0-9]*'
+    - regex: '(?<=^>%%COMMENT%%\n)(?:(?!^>%%TAGS%%).*\n)+(?=^>%%TAGS%%\n>.*#[a-zA-Z0-9\_]+)'
       template: '{{{result.match.[0]}}}'
 order:
     fields: filename, line
