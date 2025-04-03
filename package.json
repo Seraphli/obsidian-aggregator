@@ -1,6 +1,6 @@
 {
     "name": "obsidian-aggregator",
-    "version": "0.3.0",
+    "version": "0.3.1",
     "description": "This plugin helps you gather information from files, and make a summary in the file.",
     "main": "main.js",
     "scripts": {
