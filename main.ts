@@ -16,7 +16,7 @@ import { AggregatorArgs, Register, Result } from "dataclass";
 import { CURFILE, SELFBLOCK, FIELDS, ORDERS } from "./constants";
 import * as Handlebars from "handlebars";
 import * as _ from "lodash";
-import * as moment from "moment";
+import moment from "moment";
 
 function checkOrder(fields: string[], orders: string[]) {
 	if (fields.length != orders.length)
@@ -30,6 +30,8 @@ function checkOrder(fields: string[], orders: string[]) {
 
 export default class Aggregator extends Plugin {
 	settings: AggregatorSettings;
+	// Maximum time allowed for regex execution in ms
+	private readonly REGEX_TIMEOUT = 10000; // 10 seconds
 
 	async onload() {
 		await this.loadSettings();
@@ -37,6 +39,17 @@ export default class Aggregator extends Plugin {
 		this.registerMarkdownCodeBlockProcessor(
 			"aggregator",
 			async (source, el, ctx) => {
+				// Generate a unique ID for this execution instance
+				const execId = Math.random().toString(36).substring(2, 8); // Short hash
+				if (this.settings.debug) {
+					console.log(
+						`[${moment().format(
+							"YYYY-MM-DD HH:mm:ss"
+						)}] Aggregator[${execId}]: Starting execution`
+					);
+				}
+				const startTime = performance.now();
+
 				// Check tab
 				source = source.trim();
 				const tabMatch = source.match(/\t/gm);
@@ -59,11 +72,21 @@ export default class Aggregator extends Plugin {
 						el,
 						ctx
 					);
-					console.log("Aggregator", error);
+					console.log(
+						`[${moment().format(
+							"YYYY-MM-DD HH:mm:ss"
+						)}] Aggregator[${execId}]:`,
+						error
+					);
 					return;
 				}
 				if (this.settings.debug) {
-					console.log("Aggregator: args\n", args);
+					console.log(
+						`[${moment().format(
+							"YYYY-MM-DD HH:mm:ss"
+						)}] Aggregator[${execId}]: args\n`,
+						args
+					);
 				}
 
 				// Handle arguments
@@ -102,12 +125,22 @@ export default class Aggregator extends Plugin {
 						el,
 						ctx
 					);
-					console.log("Aggregator", error);
+					console.log(
+						`[${moment().format(
+							"YYYY-MM-DD HH:mm:ss"
+						)}] Aggregator[${execId}]:`,
+						error
+					);
 					return;
 				}
 				if (argsMatches.length == 0) return;
 				if (this.settings.debug) {
-					console.log("Aggregator: argsMatches\n", argsMatches);
+					console.log(
+						`[${moment().format(
+							"YYYY-MM-DD HH:mm:ss"
+						)}] Aggregator[${execId}]: argsMatches\n`,
+						argsMatches
+					);
 				}
 
 				// Filter files
@@ -155,7 +188,19 @@ export default class Aggregator extends Plugin {
 					for (const file of allMDFile) {
 						files.push(file.path);
 					}
-					console.log("Aggregator: files\n", files.join("\n"));
+					console.log(
+						`[${moment().format(
+							"YYYY-MM-DD HH:mm:ss"
+						)}] Aggregator[${execId}]: files\n`,
+						files.join("\n")
+					);
+					console.log(
+						`[${moment().format(
+							"YYYY-MM-DD HH:mm:ss"
+						)}] Aggregator[${execId}]: Processing ${
+							allMDFile.length
+						} files`
+					);
 				}
 
 				// Collect results
@@ -163,6 +208,13 @@ export default class Aggregator extends Plugin {
 					? Number(args.limitSearch)
 					: this.settings.limitSearch;
 				let results: Result[] = [];
+				if (this.settings.debug) {
+					console.log(
+						`[${moment().format(
+							"YYYY-MM-DD HH:mm:ss"
+						)}] Aggregator[${execId}]: Starting match collection with limitSearch=${limitSearch}`
+					);
+				}
 				for (const file of allMDFile) {
 					if (limitSearch > 0 && results.length > limitSearch) break;
 					// Read file content
@@ -178,13 +230,172 @@ export default class Aggregator extends Plugin {
 					for (const m of argsMatches) {
 						if (limitSearch > 0 && results.length > limitSearch)
 							break;
-						let matches = content.matchAll(m.regex);
-						for (let match of matches) {
+						if (this.settings.debug) {
+							console.log(
+								`[${moment().format(
+									"YYYY-MM-DD HH:mm:ss"
+								)}] Aggregator[${execId}]: Applying regex on file ${
+									file.path
+								}`
+							);
+
+							// Log file size and regex pattern
+							console.log(
+								`[${moment().format(
+									"YYYY-MM-DD HH:mm:ss"
+								)}] Aggregator[${execId}]: File size: ${
+									content.length
+								} chars, Regex pattern: ${m.regex.toString()}`
+							);
+
+							// Check for problematic regex patterns
+							const regexStr = m.regex.toString();
+							if (this.isLikelyProblematicRegex(regexStr)) {
+								console.log(
+									`[${moment().format(
+										"YYYY-MM-DD HH:mm:ss"
+									)}] Aggregator[${execId}]: ⚠️WARNING: Potentially inefficient regex pattern detected: ${regexStr}`
+								);
+							}
+						}
+
+						const regexStartTime = performance.now();
+						// Use a timeout to detect potentially problematic regex operations
+						const MAX_REGEX_TIME = 5000; // 5 seconds
+						let timeoutId: NodeJS.Timeout | null = null;
+						let timeoutWarningDisplayed = false;
+
+						if (this.settings.debug) {
+							timeoutId = setTimeout(() => {
+								console.log(
+									`[${moment().format(
+										"YYYY-MM-DD HH:mm:ss"
+									)}] Aggregator[${execId}]: ⚠️WARNING: Regex operation taking too long (>5s) on ${
+										file.path
+									}. This may be due to an inefficient regex pattern or a large file.`
+								);
+								timeoutWarningDisplayed = true;
+							}, MAX_REGEX_TIME);
+						}
+
+						let matchesArray: RegExpMatchArray[] = [];
+						try {
+							// For large files, process in chunks to avoid excessive runtime
+							if (content.length > 100000) {
+								// 100KB threshold
+								if (this.settings.debug) {
+									console.log(
+										`[${moment().format(
+											"YYYY-MM-DD HH:mm:ss"
+										)}] Aggregator[${execId}]: Large file detected (${
+											content.length
+										} chars), using chunked processing`
+									);
+								}
+
+								// Process in 50KB chunks with slight overlap to avoid missing matches at chunk boundaries
+								const chunkSize = 50000;
+								const overlap = 1000;
+								let processedChunks = 0;
+
+								for (
+									let i = 0;
+									i < content.length;
+									i += chunkSize - overlap
+								) {
+									processedChunks++;
+									if (
+										this.REGEX_TIMEOUT > 0 &&
+										performance.now() - regexStartTime >
+											this.REGEX_TIMEOUT
+									) {
+										if (this.settings.debug) {
+											console.log(
+												`[${moment().format(
+													"YYYY-MM-DD HH:mm:ss"
+												)}] Aggregator[${execId}]: ⚠️Regex timeout reached after processing ${processedChunks} chunks. Stopping further processing.`
+											);
+										}
+										break;
+									}
+
+									const chunk = content.substring(
+										i,
+										Math.min(i + chunkSize, content.length)
+									);
+									const chunkMatches = Array.from(
+										chunk.matchAll(m.regex)
+									);
+
+									// Add matches, adjusting indices for chunk position
+									for (const match of chunkMatches) {
+										// Only add if it's not a duplicate from the overlap
+										if (
+											match.index !== undefined &&
+											(i === 0 || match.index >= overlap)
+										) {
+											// Clone the match and adjust the index
+											const adjustedMatch = [
+												...match,
+											] as RegExpMatchArray;
+											if (match.index !== undefined) {
+												adjustedMatch.index =
+													i +
+													match.index -
+													(i > 0 ? overlap : 0);
+											}
+											matchesArray.push(adjustedMatch);
+										}
+									}
+								}
+							} else {
+								// For smaller files, process normally
+								let matches = content.matchAll(m.regex);
+								matchesArray = Array.from(matches);
+							}
+						} catch (error) {
+							if (this.settings.debug) {
+								console.log(
+									`[${moment().format(
+										"YYYY-MM-DD HH:mm:ss"
+									)}] Aggregator[${execId}]: ⚠️ERROR: Regex execution failed: ${error}`
+								);
+							}
+						}
+
+						const regexEndTime = performance.now();
+						if (timeoutId) clearTimeout(timeoutId);
+
+						if (this.settings.debug) {
+							const executionTime = regexEndTime - regexStartTime;
+							console.log(
+								`[${moment().format(
+									"YYYY-MM-DD HH:mm:ss"
+								)}] Aggregator[${execId}]: Regex execution took ${executionTime}ms, found ${
+									matchesArray.length
+								} matches in ${file.path}`
+							);
+
+							// Provide specific advice if the regex is slow
+							if (executionTime > 1000) {
+								console.log(
+									`[${moment().format(
+										"YYYY-MM-DD HH:mm:ss"
+									)}] Aggregator[${execId}]: ⚠️ Consider optimizing your regex pattern or using a more specific scope for this file.`
+								);
+							}
+						}
+
+						for (let match of matchesArray) {
 							if (limitSearch > 0 && results.length > limitSearch)
 								break;
 							if (this.settings.debug) {
 								console.log(
-									`Aggregator: Find match in\n${file.path} -> ${match[0]}`
+									`[${moment().format(
+										"YYYY-MM-DD HH:mm:ss"
+									)}] Aggregator[${execId}]: Find match in\n${
+										file.path
+									} -> ${match[0]}`
 								);
 							}
 
@@ -261,7 +472,12 @@ export default class Aggregator extends Plugin {
 					}
 				}
 				if (this.settings.debug) {
-					console.log("Aggregator: results\n", results);
+					console.log(
+						`[${moment().format(
+							"YYYY-MM-DD HH:mm:ss"
+						)}] Aggregator[${execId}]: results\n`,
+						results
+					);
 				}
 
 				// Create summary
@@ -328,7 +544,12 @@ export default class Aggregator extends Plugin {
 					summaries.push(summary);
 				}
 				if (this.settings.debug) {
-					console.log("Aggregator: summaries\n", summaries);
+					console.log(
+						`[${moment().format(
+							"YYYY-MM-DD HH:mm:ss"
+						)}] Aggregator[${execId}]: summaries\n`,
+						summaries
+					);
 				}
 
 				const jstr =
@@ -337,7 +558,11 @@ export default class Aggregator extends Plugin {
 						: args.joinString;
 				let summary = summaries.join(jstr);
 				if (this.settings.debug) {
-					console.log(`Aggregator: summary\n${summary}`);
+					console.log(
+						`[${moment().format(
+							"YYYY-MM-DD HH:mm:ss"
+						)}] Aggregator[${execId}]: summary\n${summary}`
+					);
 				}
 				if (!(args.decorator == null || args.decorator == undefined)) {
 					let data: {
@@ -356,16 +581,64 @@ export default class Aggregator extends Plugin {
 					summary = Handlebars.compile(args.decorator)(data);
 					if (this.settings.debug) {
 						console.log(
-							`Aggregator: decorated summary\n${summary}`
+							`[${moment().format(
+								"YYYY-MM-DD HH:mm:ss"
+							)}] Aggregator[${execId}]: decorated summary\n${summary}`
 						);
 					}
 				}
 				await this.renderMarkdown(summary, el, ctx);
+
+				// Log overall execution time
+				const endTime = performance.now();
+				const executionTime = endTime - startTime;
+				if (this.settings.debug) {
+					console.log(
+						`[${moment().format(
+							"YYYY-MM-DD HH:mm:ss"
+						)}] Aggregator[${execId}]: Execution completed in ${executionTime}ms`
+					);
+
+					// Performance advice if execution was slow
+					if (executionTime > 10000) {
+						// Over 10 seconds is quite slow
+						console.log(
+							`[${moment().format(
+								"YYYY-MM-DD HH:mm:ss"
+							)}] Aggregator[${execId}]: ⚠️ Performance recommendations:`
+						);
+						console.log(
+							`[${moment().format(
+								"YYYY-MM-DD HH:mm:ss"
+							)}] Aggregator[${execId}]: 1. Limit the scope to fewer files`
+						);
+						console.log(
+							`[${moment().format(
+								"YYYY-MM-DD HH:mm:ss"
+							)}] Aggregator[${execId}]: 2. Simplify regex patterns to avoid backtracking`
+						);
+						console.log(
+							`[${moment().format(
+								"YYYY-MM-DD HH:mm:ss"
+							)}] Aggregator[${execId}]: 3. Add more specific anchors to your patterns`
+						);
+						console.log(
+							`[${moment().format(
+								"YYYY-MM-DD HH:mm:ss"
+							)}] Aggregator[${execId}]: 4. Consider increasing limitSearch to stop processing earlier`
+						);
+					}
+				}
 			}
 		);
 
 		// This adds a settings tab so the user can configure various aspects of the plugin
 		this.addSettingTab(new AggregatorSettingTab(this.app, this));
+		console.log(
+			`[${moment().format(
+				"YYYY-MM-DD HH:mm:ss"
+			)}] Aggregator: Plugin loaded`
+		);
 	}
 
 	onunload() {}
@@ -380,6 +653,41 @@ export default class Aggregator extends Plugin {
 
 	async saveSettings() {
 		await this.saveData(this.settings);
+	}
+
+	/**
+	 * Checks if a regex pattern might be problematic for performance
+	 * @param regexStr The regex pattern as a string
+	 * @returns True if the pattern might cause performance issues
+	 */
+	private isLikelyProblematicRegex(regexStr: string): boolean {
+		// Remove regex delimiters and flags
+		regexStr = regexStr.replace(/^\/|\/[gimuy]*$/g, "");
+
+		// Check for patterns that might cause catastrophic backtracking
+		const problematicPatterns = [
+			// Nested repetition without proper anchoring
+			/\([^()]*\+[^()]*\)\+/,
+			/\([^()]*\*[^()]*\)\+/,
+			/\([^()]*\+[^()]*\)\*/,
+			/\([^()]*\*[^()]*\)\*/,
+
+			// Multiple adjacent optional patterns
+			/\.\*\.\*/,
+			/\.\+\.\+/,
+
+			// Greedy quantifiers followed by similar content
+			/\w+\s+\w+/,
+
+			// Complex lookaheads/lookbehinds with repetition
+			/\(\?=[^)]*\*[^)]*\)/,
+			/\(\?<=[^)]*\*[^)]*\)/,
+
+			// Extremely long alternatives
+			/(?:[^|]*\|){10,}/,
+		];
+
+		return problematicPatterns.some((pattern) => pattern.test(regexStr));
 	}
 
 	async renderMarkdown(
@@ -397,7 +705,9 @@ export default class Aggregator extends Plugin {
 		);
 		if (this.settings.debug) {
 			console.log(
-				`Aggregator: html element\n${summaryContainer.innerHTML}`
+				`[${moment().format(
+					"YYYY-MM-DD HH:mm:ss"
+				)}] Aggregator: html element\n${summaryContainer.innerHTML}`
 			);
 		}
 		el.replaceWith(summaryContainer);
